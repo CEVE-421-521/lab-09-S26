@@ -3,7 +3,7 @@ title: "Lab 9: Real Options & the Parking Garage"
 subtitle: "CEVE 421/521"
 date: 2026-04-03
 engine: julia
-status: draft
+status: published
 
 format:
   html:
@@ -108,29 +108,29 @@ We'll use them throughout the lab.
 ```{julia}
 #| output: false
 # Demand
-const INITIAL_DEMAND = 750      # spaces on opening day
-const GROWTH_RATE = 0.08 # ~8%/year; calibrated so 6-floor garage is deterministic optimum
+initial_demand = 750       # spaces on opening day
+growth_rate = 0.08         # ~8%/year; calibrated so 6-floor garage is deterministic optimum
 
 # Revenue and cost
-const REVENUE_PER_SPACE = 10_000  # $/year per space used
-const OPERATING_COST_PER_SPACE = 2_000  # $/year per space available
-const LAND_LEASE = 3_600_000     # $/year
-const CONSTRUCTION_COST_PER_SPACE = 16_000  # $ per space (ground level)
-const LEVEL_COST_INCREASE = 1.10  # 10% more per level above ground
+revenue_per_space = 10_000           # $/year per space used
+operating_cost_per_space = 2_000     # $/year per space available
+land_lease = 3_600_000               # $/year
+construction_cost_per_space = 16_000 # $ per space (ground level)
+level_cost_increase = 1.10           # 10% more per level above ground
 
 # Design
-const SPACES_PER_LEVEL = 200
-const MAX_LEVELS = 8
+spaces_per_level = 200
+max_levels = 8
 
 # Economics
-const DISCOUNT_RATE = 0.12
-const HORIZON = 20  # years
+discount_rate = 0.12
+horizon = 20  # years
 
 # Uncertainty
-const VOLATILITY = 0.15  # annual demand volatility
+volatility = 0.15  # annual demand volatility
 
 # Flexibility
-const RETROFIT_PREMIUM = 1.10  # 10% extra cost for adding levels later
+retrofit_premium = 1.10  # 10% extra cost for adding levels later
 ```
 
 ## Section 1: Deterministic NPV
@@ -148,7 +148,7 @@ where $D_0 = 750$ and $g = 0.08$/year (approximately 8% annual growth).
 
 ```{julia}
 #| output: false
-demand_deterministic = [INITIAL_DEMAND * exp(GROWTH_RATE * t) for t in 1:HORIZON]
+demand_deterministic = [initial_demand * exp(growth_rate * t) for t in 1:horizon]
 ```
 
 ### Implement `calculate_npv`
@@ -170,7 +170,7 @@ The key equations are:
     calculate_npv(n_levels, demand)
 
 Compute the NPV of a rigid parking garage with `n_levels` levels,
-given a demand trajectory `demand` (a vector of length `HORIZON`).
+given a demand trajectory `demand` (a vector of length `horizon`).
 
 Returns the NPV in dollars.
 """
@@ -230,7 +230,7 @@ Model demand as a **geometric Brownian motion** (GBM):
 
 $$D_{t+1} = D_t \cdot \exp\!\left[\left(\mu - \frac{\sigma^2}{2}\right) + \sigma\,\varepsilon_t\right], \quad \varepsilon_t \sim \mathcal{N}(0,1)$$
 
-where $\mu$ = `GROWTH_RATE` (the same 0.08 from Section 1) and $\sigma$ = `VOLATILITY` (0.15).
+where $\mu$ = `growth_rate` (the same 0.08 from Section 1) and $\sigma$ = `volatility` (0.15).
 
 ::: {.callout-note}
 The $-\sigma^2/2$ correction ensures that the *expected* demand path matches the deterministic trajectory from Section 1.
@@ -247,10 +247,10 @@ Simulate one demand trajectory of length `n_years` using geometric Brownian moti
 Returns a vector of demand values for years 1 through `n_years`.
 """
 function simulate_demand(
-    n_years; mean_growth_rate=GROWTH_RATE, volatility=VOLATILITY, initial_demand=INITIAL_DEMAND
+    n_years; mean_growth_rate=growth_rate, σ=volatility, D₀=initial_demand
 )
     # TODO: replace this with your GBM implementation
-    return [initial_demand * exp(mean_growth_rate * t) for t in 1:n_years]  # deterministic placeholder
+    return [D₀ * exp(mean_growth_rate * t) for t in 1:n_years]  # deterministic placeholder
 end
 ```
 
@@ -262,7 +262,7 @@ Generate 2,000 demand trajectories and compute the NPV for each garage size unde
 ```{julia}
 #| output: false
 n_scenarios = 2_000
-demand_scenarios = [simulate_demand(HORIZON) for _ in 1:n_scenarios]
+demand_scenarios = [simulate_demand(horizon) for _ in 1:n_scenarios]
 
 # Compute NPV for each scenario and each garage size
 npv_results = DataFrame(;
@@ -352,7 +352,7 @@ You'll need to track `current_levels` and `capacity` as they change over time.
 
 ```{julia}
 """
-    simulate_flexible_garage(initial_levels, demand_trajectory; expand_threshold=0.8, max_levels=MAX_LEVELS)
+    simulate_flexible_garage(initial_levels, demand_trajectory; expand_threshold=0.8, n_max=max_levels)
 
 Simulate a flexible parking garage that starts with `initial_levels` levels
 and can expand by one level per year when occupancy exceeds `expand_threshold`.
@@ -366,7 +366,7 @@ function simulate_flexible_garage(
     initial_levels,
     demand_trajectory;
     expand_threshold=0.8,
-    max_levels=MAX_LEVELS,
+    n_max=max_levels,
 )
     # TODO: replace this with your implementation
     # Hint: start by computing the initial construction cost (with retrofit premium),
@@ -403,7 +403,7 @@ comparison = DataFrame(;
     Rigid_6_floors=[
         round(
             sum(
-                CONSTRUCTION_COST_PER_SPACE * SPACES_PER_LEVEL * LEVEL_COST_INCREASE^(l - 1)
+                construction_cost_per_space * spaces_per_level * level_cost_increase^(l - 1)
                 for l in 1:6
             ) / 1e6;
             digits=2,
@@ -415,10 +415,10 @@ comparison = DataFrame(;
     Flexible_4_plus_option=[
         round(
             sum(
-                CONSTRUCTION_COST_PER_SPACE *
-                SPACES_PER_LEVEL *
-                LEVEL_COST_INCREASE^(l - 1) *
-                RETROFIT_PREMIUM for l in 1:4
+                construction_cost_per_space *
+                spaces_per_level *
+                level_cost_increase^(l - 1) *
+                retrofit_premium for l in 1:4
             ) / 1e6;
             digits=2,
         ),
